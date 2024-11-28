@@ -49,7 +49,8 @@ def get_loaders(data_path, val_split, test_split, seed, batch_size, method='ssd'
 
 def get_features(model, dataloader):
     features, labels = [], []
-    device = model.device
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model.to(device)
     model.eval()
 
     for i, batch in enumerate(dataloader):
