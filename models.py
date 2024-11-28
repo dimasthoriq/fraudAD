@@ -16,22 +16,22 @@ class SSLNet(torch.nn.Module):
             # adds linear layer
             layers.append(torch.nn.Linear(self.dims[i], self.dims[i+1]))
 
+            if self.norm:  # adds batch normalization layer
+                layers.append(torch.nn.BatchNorm1d(self.dims[i+1]))
+
+            # adds activation layer
+            if self.activation == 'ReLU':
+                layers.append(torch.nn.ReLU())
+            elif self.activation == 'LeakyReLU':
+                layers.append(torch.nn.LeakyReLU())
+            elif self.activation == 'ELU':
+                layers.append(torch.nn.ELU())
+            elif self.activation == 'Sigmoid':
+                layers.append(torch.nn.Sigmoid())
+            elif self.activation == 'Tanh':
+                layers.append(torch.nn.Tanh())
+
             if i < len(self.dims) - 2:
-                if self.norm:  # adds batch normalization layer
-                    layers.append(torch.nn.BatchNorm1d(self.dims[i+1]))
-
-                # adds activation layer
-                if self.activation == 'ReLU':
-                    layers.append(torch.nn.ReLU())
-                elif self.activation == 'LeakyReLU':
-                    layers.append(torch.nn.LeakyReLU())
-                elif self.activation == 'ELU':
-                    layers.append(torch.nn.ELU())
-                elif self.activation == 'Sigmoid':
-                    layers.append(torch.nn.Sigmoid())
-                elif self.activation == 'Tanh':
-                    layers.append(torch.nn.Tanh())
-
                 if self.drop is not None:  # adds dropout layer
                     layers.append(torch.nn.Dropout(self.drop))
 
