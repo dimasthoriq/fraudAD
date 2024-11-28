@@ -113,7 +113,7 @@ def train_ssd(model, train_loader, val_loader, config):
     criterion = SupConLoss(temperature=config['temperature'], contrast_mode=config['contrast_mode'])
 
     optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=config['learning_rate'],
+                                 lr=config['lr'],
                                  weight_decay=config['weight_decay'],
                                  )
 
@@ -186,4 +186,4 @@ def train_ssd(model, train_loader, val_loader, config):
     stamp = datetime.today().strftime('%Y%m%d_%H%M')
     model_out_path = save_dir + 'SSD_' + str(config['temperature']) + 'temp_' + stamp + '.pth'
     torch.save(model, model_out_path)
-    return model, train_losses, val_losses, train_ap, val_ap
+    return model, train_losses, val_losses, train_ap, val_ap, train_fpr, val_fpr

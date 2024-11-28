@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from sklearn.covariance import ledoit_wolf
 from sklearn.metrics import roc_auc_score, average_precision_score
+from utils import get_features
 
 
 class SSDk:
@@ -51,3 +52,16 @@ def get_pr_sklearn(xin, xood):
 
 def get_fpr(xin, xood, tpr=95):
     return np.sum(xood < np.percentile(xin, tpr)) / len(xood)
+
+
+def evaluate(model, train_loader, test_loader):
+    train_f, train_l = get_features(model, train_loader)
+    test_f, test_l = get_features(model, test_loader)
+
+    ssd = SSDk(train_f, train_l)
+    pred = ssd.get_score(test_f)
+
+    ap = get_pr_sklearn(pred[test_l == 0], pred[test_l == 1])
+    fpr = get_fpr(pred[test_l == 0], pred[test_l == 1])
+
+    return ap, fpr

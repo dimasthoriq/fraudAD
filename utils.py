@@ -45,3 +45,21 @@ def get_loaders(data_path, val_split, test_split, seed, batch_size, method='ssd'
     test_loader = torch.utils.data.DataLoader(test, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
+
+
+def get_features(model, dataloader):
+    features, labels = [], []
+    device = model.device
+    model.eval()
+
+    for i, batch in enumerate(dataloader):
+        if len(batch) == 3:
+            x, x_pos, label = batch
+        else:
+            x, label = batch
+
+        x, label = x.to(device), label.to(device)
+
+        features.append(model(x).data.cpu().numpy())
+        labels.append(label.data.cpu().numpy())
+    return np.array(features), np.array(labels)
