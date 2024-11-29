@@ -28,15 +28,22 @@ def get_loaders(data_path, val_split, test_split, seed, batch_size, method='ssd'
 
     if method == 'ssd':
         x_pos = x + np.random.normal(0, 0.05, x.shape)
+        x_pos_val = x_val + np.random.normal(0, 0.05, x_val.shape)
+
         train = torch.utils.data.TensorDataset(torch.tensor(x, dtype=torch.float32),
                                                torch.tensor(x_pos, dtype=torch.float32),
                                                torch.tensor(y, dtype=torch.float32)
                                                )
 
+        val = torch.utils.data.TensorDataset(torch.tensor(x_val, dtype=torch.float32),
+                                             torch.tensor(x_pos_val, dtype=torch.float32),
+                                             torch.tensor(y_val, dtype=torch.float32)
+                                             )
+
     else:
         train = torch.utils.data.TensorDataset(torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32))
-    val = torch.utils.data.TensorDataset(torch.tensor(x_val, dtype=torch.float32),
-                                         torch.tensor(y_val, dtype=torch.float32))
+        val = torch.utils.data.TensorDataset(torch.tensor(x_val, dtype=torch.float32),
+                                             torch.tensor(y_val, dtype=torch.float32))
     test = torch.utils.data.TensorDataset(torch.tensor(x_test, dtype=torch.float32),
                                           torch.tensor(y_test, dtype=torch.float32))
 
@@ -63,4 +70,8 @@ def get_features(model, dataloader):
 
         features.append(model(x).data.cpu().numpy())
         labels.append(label.data.cpu().numpy())
-    return np.array(features), np.array(labels)
+
+    features = np.concatenate(features)
+    labels = np.concatenate(labels)
+
+    return features, labels

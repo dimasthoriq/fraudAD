@@ -105,10 +105,10 @@ def validate(model, loader, criterion, ssd, device):
 
 
 def train_ssd(model, train_loader, val_loader, config):
-    torch.manual_seed(config['random_seed'])
-    torch.cuda.manual_seed(config['random_seed'])
-    torch.cuda.manual_seed_all(config['random_seed'])
-    np.random.seed(config['random_seed'])
+    torch.manual_seed(config['seed'])
+    torch.cuda.manual_seed(config['seed'])
+    torch.cuda.manual_seed_all(config['seed'])
+    np.random.seed(config['seed'])
 
     criterion = SupConLoss(temperature=config['temperature'], contrast_mode=config['contrast_mode'])
 

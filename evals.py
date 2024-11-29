@@ -12,7 +12,6 @@ class SSDk:
 
     def get_dist(self, z, known, shrunkcov=False):
         if shrunkcov:
-            print("Using ledoit-wolf covariance estimator.")
             cov = lambda x: ledoit_wolf(x)[0]
         else:
             cov = lambda x: np.cov(x.T, bias=True)
