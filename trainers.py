@@ -142,7 +142,7 @@ class TrainerSAD:
                 c[(abs(c) < 1e-6) & (c < 0)] = -1e-6
                 c[(abs(c) < 1e-6) & (c > 0)] = 1e-6
                 self.c = c.detach()
-                self.cov = np.cov(known.detach().cpu().numpy().T)
+                self.cov = torch.cov(known.detach().mT)
 
 
             loss = self.criterion(features, y, self.c, self.cov)

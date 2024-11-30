@@ -40,7 +40,7 @@ class SAD:
         self.known_inlier = train_features[train_labels == 0]
         self.known_outlier = train_features[train_labels == 1]
         self.epsilon = 1e-6
-        c = np.mean(train_features[train_labels == 0], axis=0)
+        c = np.mean(self.known_inlier, axis=0)
         c[(abs(c) < self.epsilon) & (c < 0)] = -self.epsilon
         c[(abs(c) < self.epsilon) & (c > 0)] = self.epsilon
         self.c = c
