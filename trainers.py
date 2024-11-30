@@ -182,7 +182,7 @@ def train_ssd(model, train_loader, val_loader, config):
 
     # save best model
     model.load_state_dict(best_model_wts)
-    save_dir = "./"
+    save_dir = "./Experiments/"
     stamp = datetime.today().strftime('%Y%m%d_%H%M')
     model_out_path = save_dir + 'SSD_' + str(config['temperature']) + 'temp_' + stamp + '.pth'
     torch.save(model, model_out_path)
