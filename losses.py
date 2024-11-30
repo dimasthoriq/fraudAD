@@ -75,3 +75,15 @@ class SupConLoss(torch.nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
+
+
+class SADLoss(torch.nn.Module):
+    def __init__(self, eta=1.0, epsilon=1e-6):
+        super(SADLoss, self).__init__()
+        self.eta = eta
+        self.epsilon = epsilon
+
+    def forward(self, z, c, y):
+        dist = torch.sum((z - c) ** 2, dim=1)
+        losses = torch.where(y == 0, dist, self.eta * (dist+self.epsilon)**-y)
+        return torch.mean(losses)

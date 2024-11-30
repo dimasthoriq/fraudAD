@@ -4,8 +4,8 @@ import torcheval.metrics
 import numpy as np
 from datetime import datetime
 
-from losses import SupConLoss
-from evals import SSDk, get_fpr
+from losses import SupConLoss, SADLoss
+from evals import SSDk, SAD, get_fpr
 
 
 class EarlyStopping:
@@ -24,67 +24,37 @@ class EarlyStopping:
                 self.early_stop = True
 
 
-def train_epoch(model, loader, optimizer, criterion, device):
-    model.train()
-    total_loss = 0.
-    auprc = torcheval.metrics.BinaryAUPRC()
-    f_lists = []
-    y_lists = []
+class TrainerSSD:
+    def __init__(self, model, train_loader, val_loader, criterion, config):
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.criterion = criterion
+        self.config = config
+        self.ssd = None
 
-    for x, x_pos, y in loader:
-        x, x_pos, y = x.to(device), x_pos.to(device), y.to(device)
-        optimizer.zero_grad()
-
-        combined_x = torch.cat([x, x_pos], dim=0)
-        batch_size = y.shape[0]
-
-        features = model(combined_x)
-        f1, f2 = torch.split(features, [batch_size, batch_size], dim=0)
-        features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
-
-        loss = criterion(features)
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-        f_lists.append(f1)
-        y_lists.append(y)
-
-    f = torch.cat(f_lists, dim=0).detach().cpu().numpy()
-    y = torch.cat(y_lists, dim=0).detach().cpu().numpy()
-
-    avg_loss = total_loss/len(loader)
-
-    ssd = SSDk(f, y)
-    pred = ssd.get_score(f)
-    auprc.update(torch.tensor(pred), torch.tensor(y))
-    ap = auprc.compute().detach().cpu().numpy()
-    auprc.reset()
-
-    fpr = get_fpr(pred[y == 0], pred[y == 1])
-
-    return avg_loss, ap, fpr, ssd
-
-
-def validate(model, loader, criterion, ssd, device):
-    with torch.no_grad():
-        model.eval()
+    def train_epoch(self, optimizer):
+        self.model.train()
         total_loss = 0.
         auprc = torcheval.metrics.BinaryAUPRC()
         f_lists = []
         y_lists = []
 
-        for x, x_pos, y in loader:
-            x, x_pos, y = x.to(device), x_pos.to(device), y.to(device)
+        for x, x_pos, y in self.train_loader:
+            x, x_pos, y = x.to(self.config['device']), x_pos.to(self.config['device']), y.to(self.config['device'])
+            optimizer.zero_grad()
 
             combined_x = torch.cat([x, x_pos], dim=0)
             batch_size = y.shape[0]
-            features = model(combined_x)
 
+            features = self.model(combined_x)
             f1, f2 = torch.split(features, [batch_size, batch_size], dim=0)
             features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
 
-            loss = criterion(features)
+            loss = self.criterion(features)
+            loss.backward()
+            optimizer.step()
+
             total_loss += loss.item()
             f_lists.append(f1)
             y_lists.append(y)
@@ -92,25 +62,154 @@ def validate(model, loader, criterion, ssd, device):
         f = torch.cat(f_lists, dim=0).detach().cpu().numpy()
         y = torch.cat(y_lists, dim=0).detach().cpu().numpy()
 
-        avg_loss = total_loss/len(loader)
+        avg_loss = total_loss/len(self.train_loader)
 
-        pred = ssd.get_score(f)
+        self.ssd = SSDk(f, y)
+        pred = self.ssd.get_score(f)
         auprc.update(torch.tensor(pred), torch.tensor(y))
         ap = auprc.compute().detach().cpu().numpy()
         auprc.reset()
 
         fpr = get_fpr(pred[y == 0], pred[y == 1])
 
-    return avg_loss, ap, fpr
+        return avg_loss, ap, fpr
+
+    def validate(self):
+        with torch.no_grad():
+            self.model.eval()
+            total_loss = 0.
+            auprc = torcheval.metrics.BinaryAUPRC()
+            f_lists = []
+            y_lists = []
+
+            for x, x_pos, y in self.val_loader:
+                x, x_pos, y = x.to(self.config['device']), x_pos.to(self.config['device']), y.to(self.config['device'])
+
+                combined_x = torch.cat([x, x_pos], dim=0)
+                batch_size = y.shape[0]
+                features = self.model(combined_x)
+
+                f1, f2 = torch.split(features, [batch_size, batch_size], dim=0)
+                features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+
+                loss = self.criterion(features)
+                total_loss += loss.item()
+                f_lists.append(f1)
+                y_lists.append(y)
+
+            f = torch.cat(f_lists, dim=0).detach().cpu().numpy()
+            y = torch.cat(y_lists, dim=0).detach().cpu().numpy()
+
+            avg_loss = total_loss/len(self.val_loader)
+
+            pred = self.ssd.get_score(f)
+            auprc.update(torch.tensor(pred), torch.tensor(y))
+            ap = auprc.compute().detach().cpu().numpy()
+            auprc.reset()
+
+            fpr = get_fpr(pred[y == 0], pred[y == 1])
+
+        return avg_loss, ap, fpr
 
 
-def train_ssd(model, train_loader, val_loader, config):
+class TrainerSAD:
+    def __init__(self, model, train_loader, val_loader, criterion, config):
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.criterion = criterion
+        self.config = config
+        self.c = None
+        self.sad = None
+
+    def train_epoch(self, optimizer):
+        self.model.train()
+        total_loss = 0.
+        auprc = torcheval.metrics.BinaryAUPRC()
+        f_lists = []
+        y_lists = []
+
+        for x, y in self.train_loader:
+            x, y = x.to(self.config['device']), y.to(self.config['device'])
+            optimizer.zero_grad()
+            features = self.model(x)
+
+            if self.c is None:
+                c = torch.mean(features[y == 0], dim=0)
+                c[(abs(c) < 1e-6) & (c < 0)] = -1e-6
+                c[(abs(c) < 1e-6) & (c > 0)] = 1e-6
+                self.c = c.detach()
+                print(f'Center initialized: {self.c}')
+
+            loss = self.criterion(features, self.c, y)
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+            f_lists.append(features)
+            y_lists.append(y)
+
+        f = torch.cat(f_lists, dim=0).detach().cpu().numpy()
+        y = torch.cat(y_lists, dim=0).detach().cpu().numpy()
+
+        avg_loss = total_loss/len(self.train_loader)
+
+        self.sad = SAD(f, y)
+        pred = self.sad.get_score(z=f, c=self.c.cpu().numpy())
+        auprc.update(torch.tensor(pred), torch.tensor(y))
+        ap = auprc.compute().detach().cpu().numpy()
+        auprc.reset()
+
+        fpr = get_fpr(pred[y == 0], pred[y == 1])
+
+        return avg_loss, ap, fpr
+
+    def validate(self):
+        with torch.no_grad():
+            self.model.eval()
+            total_loss = 0.
+            auprc = torcheval.metrics.BinaryAUPRC()
+            f_lists = []
+            y_lists = []
+
+            for x, y in self.val_loader:
+                x, y = x.to(self.config['device']), y.to(self.config['device'])
+                features = self.model(x)
+                loss = self.criterion(features, self.c, y)
+
+                total_loss += loss.item()
+                f_lists.append(features)
+                y_lists.append(y)
+
+            f = torch.cat(f_lists, dim=0).detach().cpu().numpy()
+            y = torch.cat(y_lists, dim=0).detach().cpu().numpy()
+
+            avg_loss = total_loss/len(self.val_loader)
+
+            pred = self.sad.get_score(z=f, c=self.c)
+            auprc.update(torch.tensor(pred), torch.tensor(y))
+            ap = auprc.compute().detach().cpu().numpy()
+            auprc.reset()
+
+            fpr = get_fpr(pred[y == 0], pred[y == 1])
+
+        return avg_loss, ap, fpr
+
+
+def train(model, train_loader, val_loader, config):
     torch.manual_seed(config['seed'])
     torch.cuda.manual_seed(config['seed'])
     torch.cuda.manual_seed_all(config['seed'])
     np.random.seed(config['seed'])
 
-    criterion = SupConLoss(temperature=config['temperature'], contrast_mode=config['contrast_mode'])
+    if config['method'] == 'ssd':
+        criterion = SupConLoss(temperature=config['temperature'], contrast_mode=config['contrast_mode'])
+        trainer = TrainerSSD(model, train_loader, val_loader, criterion, config)
+        hyperparam_str = str(config['temperature']) + 'temp_'
+    else:
+        criterion = SADLoss(eta=config['eta'])
+        trainer = TrainerSAD(model, train_loader, val_loader, criterion, config)
+        hyperparam_str = str(config['eta']) + 'eta_'
 
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=config['lr'],
@@ -137,8 +236,8 @@ def train_ssd(model, train_loader, val_loader, config):
     best_epoch = 0
 
     for epoch in range(1, config['epochs']+1):
-        epoch_loss, epoch_ap, epoch_fpr, ssd = train_epoch(model, train_loader, optimizer, criterion, config['device'])
-        epoch_val_loss, epoch_val_ap, epoch_val_fpr = validate(model, val_loader, criterion, ssd, config['device'])
+        epoch_loss, epoch_ap, epoch_fpr = trainer.train_epoch(optimizer)
+        epoch_val_loss, epoch_val_ap, epoch_val_fpr = trainer.validate()
 
         train_losses.append(epoch_loss)
         val_losses.append(epoch_val_loss)
@@ -184,6 +283,6 @@ def train_ssd(model, train_loader, val_loader, config):
     model.load_state_dict(best_model_wts)
     save_dir = "./Experiments/"
     stamp = datetime.today().strftime('%Y%m%d_%H%M')
-    model_out_path = save_dir + 'SSD_' + str(config['temperature']) + 'temp_' + stamp + '.pth'
+    model_out_path = save_dir + str(config['method']) + '_' + hyperparam_str + stamp + '.pth'
     torch.save(model, model_out_path)
     return model, train_losses, val_losses, train_ap, val_ap, train_fpr, val_fpr
