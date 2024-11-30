@@ -87,15 +87,8 @@ class SADLoss(torch.nn.Module):
     def forward(self, z, c, y):
         if self.method == 'sad-maha':
             z_0 = z[y == 0]
-            dist = torch.sum(
-                (z - c)
-                * (
-                    torch.pinverse(torch.cov(z_0.T)).matmul(
-                        c.T
-                    )
-                ).T,
-                dim=-1,
-            )
+            delta = z - c
+            dist = torch.sum(delta @ torch.linalg.pinv(torch.cov(z_0.mT)) * delta, dim=-1)
         else:
             dist = torch.sum((z - c) ** 2, dim=1)
         losses = torch.where(y == 0, dist, self.eta * (dist+self.epsilon)**-y)
