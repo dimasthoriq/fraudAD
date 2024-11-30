@@ -119,6 +119,7 @@ class TrainerSAD:
         self.val_loader = val_loader
         self.criterion = criterion
         self.config = config
+        self.method = config['method']
         self.c = None
         self.sad = None
 
@@ -155,7 +156,10 @@ class TrainerSAD:
         avg_loss = total_loss/len(self.train_loader)
 
         self.sad = SAD(f, y)
-        pred = self.sad.get_score(z=f, c=self.c.cpu().numpy())
+        if self.method == 'sad':
+            pred = self.sad.get_score(z=f, c=self.c.cpu().numpy())
+        else:
+            pred = self.sad.get_mahalanobis_score(z=f)
         auprc.update(torch.tensor(pred), torch.tensor(y))
         ap = auprc.compute().detach().cpu().numpy()
         auprc.reset()
@@ -186,7 +190,10 @@ class TrainerSAD:
 
             avg_loss = total_loss/len(self.val_loader)
 
-            pred = self.sad.get_score(z=f, c=self.c)
+            if self.method == 'sad':
+                pred = self.sad.get_score(z=f, c=self.c)
+            else:
+                pred = self.sad.get_mahalanobis_score(z=f)
             auprc.update(torch.tensor(pred), torch.tensor(y))
             ap = auprc.compute().detach().cpu().numpy()
             auprc.reset()
@@ -207,7 +214,7 @@ def train(model, train_loader, val_loader, config):
         trainer = TrainerSSD(model, train_loader, val_loader, criterion, config)
         hyperparam_str = str(config['temperature']) + 'temp_'
     else:
-        criterion = SADLoss(eta=config['eta'])
+        criterion = SADLoss(eta=config['eta'], method=config['method'])
         trainer = TrainerSAD(model, train_loader, val_loader, criterion, config)
         hyperparam_str = str(config['eta']) + 'eta_'
 

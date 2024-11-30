@@ -78,12 +78,25 @@ class SupConLoss(torch.nn.Module):
 
 
 class SADLoss(torch.nn.Module):
-    def __init__(self, eta=1.0, epsilon=1e-6):
+    def __init__(self, eta=1.0, epsilon=1e-6, method='sad'):
         super(SADLoss, self).__init__()
         self.eta = eta
         self.epsilon = epsilon
+        self.method = method
 
     def forward(self, z, c, y):
-        dist = torch.sum((z - c) ** 2, dim=1)
+        if self.method == 'sad-maha':
+            z_0 = z[y == 0]
+            dist = torch.sum(
+                (z - c)
+                * (
+                    torch.pinverse(torch.cov(z_0.T)).matmul(
+                        c.T
+                    )
+                ).T,
+                dim=-1,
+            )
+        else:
+            dist = torch.sum((z - c) ** 2, dim=1)
         losses = torch.where(y == 0, dist, self.eta * (dist+self.epsilon)**-y)
         return torch.mean(losses)
