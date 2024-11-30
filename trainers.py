@@ -121,6 +121,7 @@ class TrainerSAD:
         self.config = config
         self.method = config['method']
         self.c = None
+        self.cov = None
         self.sad = None
 
     def train_epoch(self, optimizer):
@@ -136,13 +137,15 @@ class TrainerSAD:
             features = self.model(x)
 
             if self.c is None:
-                c = torch.mean(features[y == 0], dim=0)
+                known = features[y == 0]
+                c = torch.mean(known, dim=0)
                 c[(abs(c) < 1e-6) & (c < 0)] = -1e-6
                 c[(abs(c) < 1e-6) & (c > 0)] = 1e-6
                 self.c = c.detach()
-                print(f'Center initialized: {self.c}')
+                self.cov = np.cov(known.detach().cpu().numpy().T)
 
-            loss = self.criterion(features, self.c, y)
+
+            loss = self.criterion(features, y, self.c, self.cov)
             loss.backward()
             optimizer.step()
 
@@ -179,7 +182,7 @@ class TrainerSAD:
             for x, y in self.val_loader:
                 x, y = x.to(self.config['device']), y.to(self.config['device'])
                 features = self.model(x)
-                loss = self.criterion(features, self.c, y)
+                loss = self.criterion(features, y, self.c, self.cov)
 
                 total_loss += loss.item()
                 f_lists.append(features)
