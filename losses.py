@@ -1,21 +1,19 @@
 import torch
 
 
-class SupConLoss(torch.nn.Module):
+class NTXentLoss(torch.nn.Module):
     """
-    Supervised contrastive loss as introduced in the SSD paper.
-    Also supports the unsupervised contrastive loss in SimCLR paper.
+    Unsupervised contrastive loss as introduced in the SSD paper.
     """
 
     def __init__(self, temperature=0.07, contrast_mode='one'):
-        super(SupConLoss, self).__init__()
+        super(NTXentLoss, self).__init__()
         self.temperature = temperature
         self.contrast_mode = contrast_mode
 
     def forward(self, features):
         """
         Compute loss for model.
-        Equals to SimCLR unsupervised contrastive loss when `labels` and `mask` are both None.
 
         Args:
             features: hidden vector of shape [batch_size, n_views, ...].

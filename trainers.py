@@ -4,7 +4,7 @@ import torcheval.metrics
 import numpy as np
 from datetime import datetime
 
-from losses import SupConLoss, SADLoss
+from losses import NTXentLoss, SADLoss
 from evals import SSDk, SAD, get_fpr
 
 
@@ -213,7 +213,7 @@ def train(model, train_loader, val_loader, config):
     np.random.seed(config['seed'])
 
     if config['method'] == 'ssd':
-        criterion = SupConLoss(temperature=config['temperature'], contrast_mode=config['contrast_mode'])
+        criterion = NTXentLoss(temperature=config['temperature'], contrast_mode=config['contrast_mode'])
         trainer = TrainerSSD(model, train_loader, val_loader, criterion, config)
         hyperparam_str = str(config['temperature']) + 'temp_'
     else:
